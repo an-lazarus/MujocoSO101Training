@@ -1,0 +1,18 @@
+{
+  "env": {
+    "type": "gym_manipulator",
+    "name": "gym_hil",
+    "task": "PandaPickCubeKeyboard-v0",
+    "fps": 10
+  },
+  "dataset": {
+    "repo_id": "an-lazarus/il_gym_test",
+    "root": null,
+    "task": "pick_cube",
+    "num_episodes_to_record": 1,
+    "replay_episode": null,
+    "push_to_hub": false
+  },
+  "mode": "record",
+  "device": "cpu"
+}
