@@ -39,3 +39,38 @@
 3. **pip vs uv**: pip 26 stalls in dependency resolution for lerobot's complex dep tree (10+ min, zero packages installed). Use `uv` for installs in this project.
 4. **CUDA libs on CPU setup**: PyTorch for Linux downloads CUDA-enabled version (~8GB total including NVIDIA CUDA stubs) even if `device: cpu`. Accept this — it's the default torch on Linux.
 5. **WSL2 write speed**: Large shared library extraction (.so files) writes at 3-8 MB/s — expect 30-40 min for fresh installs.
+
+---
+
+# Phase 1 Setup Log — fresh WSL2 machine (record.sh end-to-end)
+
+> NOTE: The Phase 0 log above is from a *different, older machine* (conda env `lerobot-hil`).
+> This Phase 1 was done on a fresh **WSL2 Ubuntu 24.04** install where nothing was preinstalled.
+> Runtime env: `uv` venv at `~/mujoco-sim`, Python 3.12.3. Full traceable detail in `CHANGES.md`.
+
+| Date | Step | What happened | Fixes applied |
+|------|------|---------------|---------------|
+| 2026-06-25 | Assess | Cloned repo had no environment; WSL Ubuntu 24.04 fresh, system Python 3.12.3, no pip, no conda. WSLg active (DISPLAY=:0) | Built from scratch with `uv` |
+| 2026-06-25 | uv | Installed `uv` via official script (no sudo) | — |
+| 2026-06-25 | venv | `uv venv --python 3.12` at `~/mujoco-sim` | — |
+| 2026-06-25 | mujoco | `uv pip install mujoco` (3.10.0; later resolved to 3.8.1 by lerobot) | — |
+| 2026-06-25 | lerobot | `uv pip install "lerobot[hilserl]"` failed building `evdev` twice (missing `linux/input.h`, then `Python.h`) | `sudo apt install build-essential python3-dev` |
+| 2026-06-25 | record.sh | Bare `python` → venv interpreter by absolute path | Edited interpreter line |
+| 2026-06-25 | CRLF | Script had CRLF (`$'\r'`), broke line-continuations | `sed -i 's/\r$//'`; run `~/record.sh` |
+| 2026-06-25 | keymap | No Right Ctrl on keyboard | Remapped gripper to `o`/`p` in gym_hil `intervention_utils.py` |
+| 2026-06-26 | render | GPU/Zink/D3D12 segfault; `osmesa` broke the viewer ("framebuffer not complete") | `MUJOCO_GL=glfw` + `LIBGL_ALWAYS_SOFTWARE=1` + `GALLIUM_DRIVER=llvmpipe`; `apt install libgl1 libglfw3 libosmesa6 libglib2.0-0` |
+| 2026-06-26 | encode | SVT-AV1 (libsvtav1) segfault during concurrent episode encode | `vcodec="h264"` in lerobot `gym_manipulator.py` `LeRobotDataset.create(...)` |
+| 2026-06-26 | ✅ run | `record.sh` launches viewer, teleoperated, episode saved to `~/.cache/huggingface/lerobot/an-lazarus/il_gym_test` | — |
+
+## Phase 1 environment details
+
+- **Runtime:** `uv` venv `~/mujoco-sim/.venv`, Python 3.12.3, WSL2 Ubuntu 24.04, CPU-only.
+- **Run command:** `bash ~/record.sh` (canonical copy committed in repo).
+- **Key versions:** lerobot 0.5.1, gym-hil 0.1.14, mujoco 3.8.1, gymnasium 1.3.0, torch 2.10.0+cu128, PyAV 15.1.0, numpy 2.2.6.
+
+## Phase 1 known friction points
+
+1. **`build-essential` + `python3-dev`** are mandatory on a fresh WSL (evdev compiles from source). The error's suggested `linux-headers-$(uname -r)` does NOT work on WSL.
+2. **Software GL is mandatory under WSLg.** Use `glfw` + `llvmpipe`; never `osmesa` when a viewer window is wanted.
+3. **Default video codec crashes.** Force `h264` instead of `libsvtav1`.
+4. **Two fixes live in installed packages** (codec, keymap) and are lost on `pip --upgrade` — see `CHANGES.md` §"Fragile edits".
